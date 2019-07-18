@@ -43,7 +43,7 @@ class MainActivity : AppCompatActivity() {
 //                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, uri)
 //                .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, path)
 //            startActivityForResult(intent, CODE_IMG_EDIT)
-//            Log.d("MainActivity", "onCreate: setOnClickListener")
+            Log.d("MainActivity", "onCreate: setOnClickListener")
 //            var intent = Intent(this@MainActivity,IMGEditActivity::class.java)
 //            startActivity(intent)
 
