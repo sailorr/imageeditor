@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.sailor.imaging">
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <application>
+
+        <activity
+                android:name=".IMGGalleryActivity"
+                android:screenOrientation="portrait"
+                android:theme="@style/ImageGalleryTheme" />
+
+        <activity
+                android:name=".IMGEditActivity"
+                android:screenOrientation="portrait"
+                android:theme="@style/ImageEditTheme"
+                android:windowSoftInputMode="stateAlwaysHidden" />
+
+    </application>
+</manifest>
+
