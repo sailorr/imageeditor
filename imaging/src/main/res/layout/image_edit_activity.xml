@@ -1,25 +1,235 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+
+
+<!--    <ViewSwitcher-->
+<!--        android:id="@+id/vs_op"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="match_parent"-->
+<!--        android:inAnimation="@anim/image_fade_in"-->
+<!--        android:outAnimation="@anim/image_fade_out">-->
+
+<!--        <include layout="@layout/image_edit_opt_layout" />-->
+
+<!--        <include layout="@layout/image_edit_clip_layout" />-->
+
+<!--    </ViewSwitcher>-->
+
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FF1B1B1B">
+
 
     <com.sailor.imaging.view.IMGView
-        android:id="@+id/image_canvas"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#000" />
+            android:id="@+id/image_canvas"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:background="#ccc"
+            app:layout_constraintBottom_toTopOf="@id/cl_paint"
+            app:layout_constraintTop_toBottomOf="@id/img_lastStep" />
 
-    <ViewSwitcher
-        android:id="@+id/vs_op"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:inAnimation="@anim/image_fade_in"
-        android:outAnimation="@anim/image_fade_out">
+    <ImageView
+            android:id="@+id/img_lastStep"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="15dp"
+            android:src="@drawable/ic_image_laststep"
+            android:visibility="gone"
+            app:layout_constraintHorizontal_chainStyle="packed"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toLeftOf="@id/img_nextStep"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:visibility="visible" />
 
-        <include layout="@layout/image_edit_opt_layout" />
+    <ImageView
+            android:id="@+id/img_nextStep"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="15dp"
+            android:src="@drawable/ic_image_nextstep"
+            android:visibility="gone"
+            app:layout_constraintLeft_toRightOf="@id/img_lastStep"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            tools:visibility="visible" />
 
-        <include layout="@layout/image_edit_clip_layout" />
+    <android.support.constraint.ConstraintLayout
+            android:id="@+id/cl_paint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="5dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toTopOf="@id/cl_mode"
+            tools:visibility="visible">
 
-    </ViewSwitcher>
+        <TextView
+                android:id="@+id/tv_paintColor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="10dp"
+                android:text="画笔颜色"
+                android:textColor="@color/image_color_white"
+                android:textSize="16sp"
+                app:layout_constraintBottom_toTopOf="@id/tv_paintSize"
+                tools:ignore="MissingConstraints" />
 
-</FrameLayout>
+
+
+        <include
+                android:id="@+id/rg_color"
+                layout="@layout/image_color_layout"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintBottom_toBottomOf="@id/tv_paintColor"
+                app:layout_constraintLeft_toRightOf="@id/tv_paintColor"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toTopOf="@id/tv_paintColor" />
+
+        <TextView
+                android:id="@+id/tv_paintSize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:padding="10dp"
+                android:text="画笔颜色"
+                android:textColor="@color/image_color_white"
+                android:textSize="16sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                tools:ignore="MissingConstraints" />
+
+        <!--        <SeekBar-->
+        <!--                android:layout_marginEnd="10dp"-->
+        <!--                android:id="@+id/sk_paintSize"-->
+        <!--                android:layout_width="0dp"-->
+        <!--                android:layout_height="wrap_content"-->
+        <!--                android:max="4"-->
+        <!--                android:progress="1"-->
+        <!--                app:layout_constraintBottom_toBottomOf="@id/tv_paintSize"-->
+        <!--                app:layout_constraintLeft_toRightOf="@id/tv_paintSize"-->
+        <!--                app:layout_constraintRight_toLeftOf="@+id/tv_eraser"-->
+        <!--                app:layout_constraintTop_toTopOf="@id/tv_paintSize" />-->
+
+        <com.warkiz.widget.IndicatorSeekBar
+                android:id="@+id/sk_paintSize"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                app:isb_max="5"
+                app:isb_min="1"
+                app:isb_ticks_count="5"
+                app:isb_progress="3"
+                app:isb_show_tick_marks_type="oval"
+                app:isb_tick_marks_size="13dp"
+                app:isb_tick_marks_color="#FF484848"
+                app:isb_thumb_drawable="@mipmap/ic_sb_button"
+                app:isb_thumb_size="50dp"
+                app:isb_track_progress_color="#FF484848"
+                app:isb_track_background_color="#FF484848"
+                app:isb_track_progress_size="1dp"
+                app:isb_show_indicator="none"
+                app:layout_constraintBottom_toBottomOf="@id/tv_paintSize"
+                app:layout_constraintLeft_toRightOf="@id/tv_paintSize"
+                app:layout_constraintRight_toLeftOf="@+id/tv_eraser"
+                app:layout_constraintTop_toTopOf="@id/tv_paintSize" />
+
+        <TextView
+                android:id="@+id/tv_eraser"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_tv_white"
+                android:gravity="center"
+                android:padding="5dp"
+                android:text="橡皮擦"
+                android:textColor="@color/image_color_white"
+                android:textSize="16sp"
+                app:layout_constraintBottom_toBottomOf="@id/tv_paintSize"
+                app:layout_constraintLeft_toRightOf="@id/sk_paintSize"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toTopOf="@id/tv_paintSize"
+                app:layout_constraintWidth_percent="0.2" />
+    </android.support.constraint.ConstraintLayout>
+
+    <android.support.constraint.ConstraintLayout
+            android:id="@+id/cl_mode"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/image_color_white"
+            app:layout_constraintBottom_toBottomOf="parent">
+
+        <ImageView
+                android:id="@+id/img_cancer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClick"
+                android:padding="10dp"
+                android:src="@mipmap/ic_close_black"
+                app:layout_constraintLeft_toLeftOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+        <RadioGroup
+                android:id="@+id/rg_mode"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:gravity="center"
+                android:orientation="horizontal"
+                app:layout_constraintBottom_toBottomOf="@id/img_cancer"
+                app:layout_constraintLeft_toRightOf="@id/img_cancer"
+                app:layout_constraintRight_toLeftOf="@id/img_save"
+                app:layout_constraintTop_toTopOf="@id/img_cancer">
+
+            <RadioButton
+                    android:id="@+id/rb_editText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="50dp"
+                    android:button="@null"
+                    android:drawableBottom="@drawable/ic_optionrb_check_select"
+                    android:drawablePadding="3dp"
+                    android:gravity="center"
+                    android:onClick="onClick"
+                    android:padding="5dp"
+                    android:text="文字"
+                    android:textColor="@color/image_color_text"
+                    android:textSize="16sp" />
+
+            <RadioButton
+                    android:id="@+id/rb_paint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:button="@null"
+                    android:drawableBottom="@drawable/ic_optionrb_check_select"
+                    android:drawablePadding="3dp"
+                    android:gravity="center"
+                    android:onClick="onClick"
+                    android:padding="5dp"
+                    android:text="画笔"
+                    android:textColor="@color/image_color_text"
+                    android:textSize="16sp" />
+        </RadioGroup>
+
+        <ImageView
+                android:id="@+id/img_save"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="onClick"
+                android:padding="10dp"
+                android:src="@mipmap/ic_save_black"
+                app:layout_constraintRight_toRightOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+    </android.support.constraint.ConstraintLayout>
+
+    <!--    <ViewSwitcher-->
+    <!--            android:id="@+id/vs_op"-->
+    <!--            android:layout_width="match_parent"-->
+    <!--            android:layout_height="match_parent"-->
+    <!--            android:inAnimation="@anim/image_fade_in"-->
+    <!--            android:outAnimation="@anim/image_fade_out">-->
+
+    <!--                <include layout="@layout/image_edit_opt_layout" />-->
+
+    <!--            <include layout="@layout/image_edit_clip_layout" />-->
+
+    <!--    </ViewSwitcher>-->
+</android.support.constraint.ConstraintLayout>
+

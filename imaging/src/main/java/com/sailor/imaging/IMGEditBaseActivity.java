@@ -1,36 +1,51 @@
 package com.sailor.imaging;
 
 import android.app.Activity;
-import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.support.constraint.ConstraintLayout;
+import android.util.Log;
 import android.view.View;
+import android.widget.ImageView;
+import android.widget.RadioButton;
 import android.widget.RadioGroup;
-import android.widget.ViewSwitcher;
+import android.widget.TextView;
+
+import com.sailor.imaging.core.DoodleNumManager;
 import com.sailor.imaging.core.IMGMode;
 import com.sailor.imaging.core.IMGText;
 import com.sailor.imaging.view.IMGColorGroup;
 import com.sailor.imaging.view.IMGView;
+import com.warkiz.widget.IndicatorSeekBar;
+import com.warkiz.widget.OnSeekChangeListener;
+import com.warkiz.widget.SeekParams;
 
 /**
  * Created by felix on 2017/12/5 下午3:08.
  */
 
 abstract class IMGEditBaseActivity extends Activity implements View.OnClickListener,
-        IMGTextEditDialog.Callback, RadioGroup.OnCheckedChangeListener,
-        DialogInterface.OnShowListener, DialogInterface.OnDismissListener {
+        IMGTextEditDialog.Callback, RadioGroup.OnCheckedChangeListener {
 
     protected IMGView mImgView;
 
     private RadioGroup mModeGroup;
 
     private IMGColorGroup mColorGroup;
+    private ConstraintLayout mLayout;
+    private ImageView lastStep, nextStep;
+    private RadioButton mPaintButton;
+    private IndicatorSeekBar mSeekBar;
+    private TextView mErraserTv;
+
+//    private IMGColorGroup mColorGroup;
 
     private IMGTextEditDialog mTextDialog;
 
-    private View mLayoutOpSub;
 
-    private ViewSwitcher mOpSwitcher, mOpSubSwitcher;
+//    private View mLayoutOpSub;
+
+//    private ViewSwitcher mOpSwitcher, mOpSubSwitcher;
 
     public static final int OP_HIDE = -1;
 
@@ -60,122 +75,140 @@ abstract class IMGEditBaseActivity extends Activity implements View.OnClickListe
 
     private void initViews() {
         mImgView = findViewById(R.id.image_canvas);
-        mModeGroup = findViewById(R.id.rg_modes);
+        mLayout = findViewById(R.id.cl_paint);
 
-        mOpSwitcher = findViewById(R.id.vs_op);
-        mOpSubSwitcher = findViewById(R.id.vs_op_sub);
+        lastStep = findViewById(R.id.img_lastStep);
+        lastStep.setOnClickListener(this);
+        nextStep = findViewById(R.id.img_nextStep);
+        nextStep.setOnClickListener(this);
 
-        mColorGroup = findViewById(R.id.cg_colors);
+        mPaintButton = findViewById(R.id.rb_paint);
+        mPaintButton.setOnClickListener(this);
+
+        mErraserTv = findViewById(R.id.tv_eraser);
+        mErraserTv.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onModeClick(IMGMode.ERRASER);
+            }
+        });
+
+        mSeekBar = findViewById(R.id.sk_paintSize);
+        mSeekBar.setOnSeekChangeListener(new OnSeekChangeListener() {
+
+            @Override
+            public void onSeeking(SeekParams seekParams) {
+                mImgView.setPenSize(seekParams.progress);
+            }
+
+            @Override
+            public void onStartTrackingTouch(IndicatorSeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(IndicatorSeekBar seekBar) {
+
+            }
+        });
+
+        mModeGroup = findViewById(R.id.rg_mode);
+        mModeGroup.setOnCheckedChangeListener(this);
+        mColorGroup = findViewById(R.id.rg_color);
         mColorGroup.setOnCheckedChangeListener(this);
 
-        mLayoutOpSub = findViewById(R.id.layout_op_sub);
+        DoodleNumManager.INSTANCE.mListener = new DoodleNumManager.DoodleNumListener() {
+            @Override
+            public void onDoodleNum(int doodleNum, int mRevertDoodleNum) {
+                lastStep.setEnabled(doodleNum!=0);
+                nextStep.setEnabled(mRevertDoodleNum!=0);
+                Log.e("TestTag", "onDoodleNum: " + doodleNum + " mRevertDoodleNum--" + mRevertDoodleNum);
+            }
+        };
     }
 
     @Override
     public void onClick(View v) {
         int vid = v.getId();
-        if (vid == R.id.rb_doodle) {
-            onModeClick(IMGMode.DOODLE);
-        } else if (vid == R.id.btn_text) {
+        if (vid == R.id.rb_paint) {
+            isShowControl = !isShowControl;
+            if (isShowControl) {
+                onModeClick(IMGMode.DOODLE);
+                showControl(View.VISIBLE);
+            } else {
+                onModeClick(IMGMode.NONE);
+                showControl(View.GONE);
+            }
+        } else if (vid == R.id.rb_editText) {
             onTextModeClick();
-        } else if (vid == R.id.rb_mosaic) {
-            onModeClick(IMGMode.MOSAIC);
-        } else if (vid == R.id.btn_clip) {
-            onModeClick(IMGMode.CLIP);
-        } else if (vid == R.id.btn_undo) {
-            onUndoClick();
-        } else if (vid == R.id.tv_done) {
+        } else if (vid == R.id.img_save) {
             onDoneClick();
-        } else if (vid == R.id.tv_cancel) {
+        } else if (vid == R.id.img_cancer) {
             onCancelClick();
-        } else if (vid == R.id.ib_clip_cancel) {
-            onCancelClipClick();
-        } else if (vid == R.id.ib_clip_done) {
-            onDoneClipClick();
-        } else if (vid == R.id.tv_clip_reset) {
-            onResetClipClick();
-        } else if (vid == R.id.ib_clip_rotate) {
-            onRotateClipClick();
+        } else if (vid == R.id.img_lastStep) {
+            mImgView.onRevert();
+        } else if (vid == R.id.img_nextStep) {
+            mImgView.cancelRevert();
         }
     }
 
-    public void updateModeUI() {
-        IMGMode mode = mImgView.getMode();
-        switch (mode) {
-            case DOODLE:
-                mModeGroup.check(R.id.rb_doodle);
-                setOpSubDisplay(OP_SUB_DOODLE);
-                break;
-            case MOSAIC:
-                mModeGroup.check(R.id.rb_mosaic);
-                setOpSubDisplay(OP_SUB_MOSAIC);
-                break;
-            case NONE:
-                mModeGroup.clearCheck();
-                setOpSubDisplay(OP_HIDE);
-                break;
-        }
-    }
 
     public void onTextModeClick() {
-        if (mTextDialog == null) {
-            mTextDialog = new IMGTextEditDialog(this, this);
-            mTextDialog.setOnShowListener(this);
-            mTextDialog.setOnDismissListener(this);
-        }
+        mTextDialog = new IMGTextEditDialog(this, this);
+        onModeClick(IMGMode.NONE);
         mTextDialog.show();
     }
 
+
+    private boolean isShowControl;
+
     @Override
     public final void onCheckedChanged(RadioGroup group, int checkedId) {
-        onColorChanged(mColorGroup.getCheckColor());
-    }
-
-    public void setOpDisplay(int op) {
-        if (op >= 0) {
-            mOpSwitcher.setDisplayedChild(op);
-        }
-    }
-
-    public void setOpSubDisplay(int opSub) {
-        if (opSub < 0) {
-            mLayoutOpSub.setVisibility(View.GONE);
+        if (group.getId() == R.id.rg_mode) {
+            if (checkedId != R.id.rb_paint) {
+                isShowControl = false;
+                showControl(View.GONE);
+            }
         } else {
-            mOpSubSwitcher.setDisplayedChild(opSub);
-            mLayoutOpSub.setVisibility(View.VISIBLE);
+            onColorChanged(mColorGroup.getCheckColor());
         }
     }
 
-    @Override
-    public void onShow(DialogInterface dialog) {
-        mOpSwitcher.setVisibility(View.GONE);
+    private void showControl(int visibility) {
+        mLayout.setVisibility(visibility);
+        lastStep.setVisibility(visibility);
+        nextStep.setVisibility(visibility);
     }
 
-    @Override
-    public void onDismiss(DialogInterface dialog) {
-        mOpSwitcher.setVisibility(View.VISIBLE);
-    }
+
+//
+//    public void setOpSubDisplay(int opSub) {
+//        if (opSub < 0) {
+//            mLayoutOpSub.setVisibility(View.GONE);
+//        } else {
+//            mOpSubSwitcher.setDisplayedChild(opSub);
+//            mLayoutOpSub.setVisibility(View.VISIBLE);
+//        }
+//    }
+
 
     public abstract Bitmap getBitmap();
 
+    //选择编辑模式
     public abstract void onModeClick(IMGMode mode);
 
-    public abstract void onUndoClick();
-
+    //取消
     public abstract void onCancelClick();
 
+    //保存
     public abstract void onDoneClick();
 
-    public abstract void onCancelClipClick();
-
-    public abstract void onDoneClipClick();
-
-    public abstract void onResetClipClick();
-
-    public abstract void onRotateClipClick();
-
+    //画笔颜色
     public abstract void onColorChanged(int checkedColor);
 
+    //文字
     @Override
     public abstract void onText(IMGText text);
+
+
 }

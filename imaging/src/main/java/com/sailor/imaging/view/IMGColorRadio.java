@@ -96,6 +96,7 @@ public class IMGColorRadio extends RadioButton implements ValueAnimator.Animator
 
         mPaint.setColor(mStrokeColor);
         mPaint.setStyle(Paint.Style.STROKE);
+        mPaint.setStrokeWidth(3f);
         canvas.drawCircle(hw, hh, getRingRadius(radius), mPaint);
         canvas.restore();
     }

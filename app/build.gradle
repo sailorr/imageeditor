@@ -9,7 +9,7 @@ android {
     buildToolsVersion "29.0.0"
     defaultConfig {
         applicationId "com.sailor.imageeditor"
-        minSdkVersion 28
+        minSdkVersion 22
         targetSdkVersion 28
         versionCode 1
         versionName "1.0"

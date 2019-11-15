@@ -2,6 +2,7 @@ package com.sailor.imaging.core;
 
 import android.graphics.*;
 import android.util.Log;
+
 import com.sailor.imaging.core.clip.IMGClip;
 import com.sailor.imaging.core.clip.IMGClipWindow;
 import com.sailor.imaging.core.homing.IMGHoming;
@@ -19,7 +20,7 @@ public class IMGImage {
 
     private static final String TAG = "IMGImage";
 
-    private Bitmap mImage, mMosaicImage;
+    private Bitmap mBgBitmap, mDoodleBitmap;
 
     /**
      * 完整图片边框
@@ -60,7 +61,6 @@ public class IMGImage {
      */
     private IMGClipWindow mClipWin = new IMGClipWindow();
 
-    private boolean isDrawClip = false;
 
     /**
      * 编辑模式
@@ -93,17 +93,19 @@ public class IMGImage {
      * 涂鸦路径
      */
     private List<IMGPath> mDoodles = new ArrayList<>();
+    //被移除的涂鸦路径
+    private List<IMGPath> mRevertDoodles = new ArrayList<>();
 
     /**
      * 马赛克路径
      */
-    private List<IMGPath> mMosaics = new ArrayList<>();
+    private List<IMGPath> mErraser = new ArrayList<>();
 
     private static final int MIN_SIZE = 500;
 
     private static final int MAX_SIZE = 10000;
 
-    private Paint mPaint, mMosaicPaint, mShadePaint;
+    private Paint mPaint, mMosaicPaint, mShadePaint, mEraserPaint;
 
     private Matrix M = new Matrix();
 
@@ -117,6 +119,8 @@ public class IMGImage {
         DEFAULT_IMAGE = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888);
     }
 
+    private float mScale;
+
     {
         mShade.setFillType(Path.FillType.WINDING);
 
@@ -125,13 +129,28 @@ public class IMGImage {
         mPaint.setStyle(Paint.Style.STROKE);
         mPaint.setStrokeWidth(IMGPath.BASE_DOODLE_WIDTH);
         mPaint.setColor(Color.RED);
-        mPaint.setPathEffect(new CornerPathEffect(IMGPath.BASE_DOODLE_WIDTH));
         mPaint.setStrokeCap(Paint.Cap.ROUND);
         mPaint.setStrokeJoin(Paint.Join.ROUND);
+
+
+        //橡皮擦
+        mEraserPaint = new Paint();
+        mEraserPaint.setAlpha(0);
+        //这个属性是设置paint为橡皮擦重中之重
+        //这是重点
+        //下面这句代码是橡皮擦设置的重点
+        mEraserPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+        //上面这句代码是橡皮擦设置的重点（重要的事是不是一定要说三遍）
+        mEraserPaint.setAntiAlias(true);
+        mEraserPaint.setDither(true);
+        mEraserPaint.setStyle(Paint.Style.STROKE);
+        mEraserPaint.setStrokeJoin(Paint.Join.ROUND);
+        mEraserPaint.setStrokeCap(Paint.Cap.ROUND);
+        mEraserPaint.setStrokeWidth(IMGPath.BASE_DOODLE_WIDTH);
     }
 
     public IMGImage() {
-        mImage = DEFAULT_IMAGE;
+        mBgBitmap = DEFAULT_IMAGE;
 
         if (mMode == IMGMode.CLIP) {
             initShadePaint();
@@ -142,18 +161,9 @@ public class IMGImage {
         if (bitmap == null || bitmap.isRecycled()) {
             return;
         }
-
-        this.mImage = bitmap;
-
-        // 清空马赛克图层
-        if (mMosaicImage != null) {
-            mMosaicImage.recycle();
-        }
-        this.mMosaicImage = null;
-
-        makeMosaicBitmap();
-
+        this.mBgBitmap = bitmap;
         onImageChanged();
+
     }
 
     public IMGMode getMode() {
@@ -166,36 +176,7 @@ public class IMGImage {
 
         moveToBackground(mForeSticker);
 
-        if (mode == IMGMode.CLIP) {
-            setFreezing(true);
-        }
-
         this.mMode = mode;
-
-        if (mMode == IMGMode.CLIP) {
-
-            // 初始化Shade 画刷
-            initShadePaint();
-
-            // 备份裁剪前Clip 区域
-            mBackupClipRotate = getRotate();
-            mBackupClipFrame.set(mClipFrame);
-
-            float scale = 1 / getScale();
-            M.setTranslate(-mFrame.left, -mFrame.top);
-            M.postScale(scale, scale);
-            M.mapRect(mBackupClipFrame);
-
-            // 重置裁剪区域
-            mClipWin.reset(mClipFrame, getTargetRotate());
-        } else {
-
-            if (mMode == IMGMode.MOSAIC) {
-                makeMosaicBitmap();
-            }
-
-            mClipWin.setClipping(false);
-        }
     }
 
     private void rotateStickers(float rotate) {
@@ -216,82 +197,22 @@ public class IMGImage {
         }
     }
 
-    public boolean isMosaicEmpty() {
-        return mMosaics.isEmpty();
-    }
 
     public boolean isDoodleEmpty() {
         return mDoodles.isEmpty();
     }
 
-    public void undoDoodle() {
-        if (!mDoodles.isEmpty()) {
-            mDoodles.remove(mDoodles.size() - 1);
-        }
-    }
-
-    public void undoMosaic() {
-        if (!mMosaics.isEmpty()) {
-            mMosaics.remove(mMosaics.size() - 1);
-        }
-    }
 
     public RectF getClipFrame() {
         return mClipFrame;
     }
 
-    /**
-     * 裁剪区域旋转回原始角度后形成新的裁剪区域，旋转中心发生变化，
-     * 因此需要将视图窗口平移到新的旋转中心位置。
-     */
-    public IMGHoming clip(float scrollX, float scrollY) {
-        RectF frame = mClipWin.getOffsetFrame(scrollX, scrollY);
+    private Canvas mDoodleCanvas;
 
-        M.setRotate(-getRotate(), mClipFrame.centerX(), mClipFrame.centerY());
-        M.mapRect(mClipFrame, frame);
-
-        return new IMGHoming(
-                scrollX + (mClipFrame.centerX() - frame.centerX()),
-                scrollY + (mClipFrame.centerY() - frame.centerY()),
-                getScale(), getRotate()
-        );
-    }
-
-    public void toBackupClip() {
-        M.setScale(getScale(), getScale());
-        M.postTranslate(mFrame.left, mFrame.top);
-        M.mapRect(mClipFrame, mBackupClipFrame);
-        setTargetRotate(mBackupClipRotate);
-        isRequestToBaseFitting = true;
-    }
-
-    public void resetClip() {
-        setTargetRotate(getRotate() - getRotate() % 360);
-        mClipFrame.set(mFrame);
-        mClipWin.reset(mClipFrame, getTargetRotate());
-    }
-
-    private void makeMosaicBitmap() {
-        if (mMosaicImage != null || mImage == null) {
-            return;
-        }
-
-        if (mMode == IMGMode.MOSAIC) {
-
-            int w = Math.round(mImage.getWidth() / 64f);
-            int h = Math.round(mImage.getHeight() / 64f);
-
-            w = Math.max(w, 8);
-            h = Math.max(h, 8);
-
-            // 马赛克画刷
-            if (mMosaicPaint == null) {
-                mMosaicPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-                mMosaicPaint.setFilterBitmap(false);
-                mMosaicPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
-            }
-
-            mMosaicImage = Bitmap.createScaledBitmap(mImage, w, h, false);
+    private void makeDoodleBitmap() {
+        if (mDoodleCanvas == null) {
+            mDoodleBitmap = Bitmap.createBitmap((int) mFrame.right, (int) (mFrame.bottom - mFrame.top), Bitmap.Config.ARGB_8888);
+            mDoodleCanvas = new Canvas(mDoodleBitmap);
         }
     }
 
@@ -299,9 +220,6 @@ public class IMGImage {
         isInitialHoming = false;
         onWindowChanged(mWindow.width(), mWindow.height());
 
-        if (mMode == IMGMode.CLIP) {
-            mClipWin.reset(mClipFrame, getTargetRotate());
-        }
     }
 
     public RectF getFrame() {
@@ -372,26 +290,10 @@ public class IMGImage {
         }
     }
 
-    public void addPath(IMGPath path, float sx, float sy) {
+    public void addPath(IMGPath path) {
         if (path == null) return;
+        mDoodles.add(path);
 
-        float scale = 1f / getScale();
-
-        M.setTranslate(sx, sy);
-        M.postRotate(-getRotate(), mClipFrame.centerX(), mClipFrame.centerY());
-        M.postTranslate(-mFrame.left, -mFrame.top);
-        M.postScale(scale, scale);
-        path.transform(M);
-
-        switch (path.getMode()) {
-            case DOODLE:
-                mDoodles.add(path);
-                break;
-            case MOSAIC:
-                path.setWidth(path.getWidth() * scale);
-                mMosaics.add(path);
-                break;
-        }
     }
 
     private void moveToForeground(IMGSticker sticker) {
@@ -444,6 +346,7 @@ public class IMGImage {
     }
 
     public void onWindowChanged(float width, float height) {
+        Log.e("TestTag", "IMGImage-onWindowChanged: w->" + width + " h:" + height);
         if (width == 0 || height == 0) {
             return;
         }
@@ -464,7 +367,7 @@ public class IMGImage {
     }
 
     private void onInitialHoming(float width, float height) {
-        mFrame.set(0, 0, mImage.getWidth(), mImage.getHeight());
+        mFrame.set(0, 0, mBgBitmap.getWidth(), mBgBitmap.getHeight());
         mClipFrame.set(mFrame);
         mClipWin.setClipWinSize(width, height);
 
@@ -478,19 +381,20 @@ public class IMGImage {
         onInitialHomingDone();
     }
 
+
     private void toBaseHoming() {
         if (mClipFrame.isEmpty()) {
             // Bitmap invalidate.
             return;
         }
 
-        float scale = Math.min(
+        mScale = Math.min(
                 mWindow.width() / mClipFrame.width(),
                 mWindow.height() / mClipFrame.height()
         );
 
         // Scale to fit window.
-        M.setScale(scale, scale, mClipFrame.centerX(), mClipFrame.centerY());
+        M.setScale(mScale, mScale, mClipFrame.centerX(), mClipFrame.centerY());
         M.postTranslate(mWindow.centerX() - mClipFrame.centerX(), mWindow.centerY() - mClipFrame.centerY());
         M.mapRect(mFrame);
         M.mapRect(mClipFrame);
@@ -503,56 +407,69 @@ public class IMGImage {
     }
 
     public void onDrawImage(Canvas canvas) {
-
-        // 裁剪区域
         canvas.clipRect(mClipWin.isClipping() ? mFrame : mClipFrame);
+        //创建水印图层
+        makeDoodleBitmap();
+        // 绘制背景图片
+        canvas.drawBitmap(mBgBitmap, null, mFrame, null);
+        //绘制水印图片
+        canvas.drawBitmap(mDoodleBitmap, null, mFrame, null);
+    }
 
-        // 绘制图片
-        canvas.drawBitmap(mImage, null, mFrame, null);
-
-        if (DEBUG) {
-            // Clip 区域
-            mPaint.setColor(Color.RED);
-            mPaint.setStrokeWidth(6);
-            canvas.drawRect(mFrame, mPaint);
-            canvas.drawRect(mClipFrame, mPaint);
+    public void onDrawDoodles() {
+        Log.e("TestTag", "IMGImage-onDrawDoodles:  mDoodles size--" + mDoodles.size());
+        DoodleNumManager.INSTANCE.mListener.onDoodleNum(mDoodles.size(), mRevertDoodles.size());
+        for (IMGPath path : mDoodles) {
+            mDoodleCanvas.drawPath(path.getPath(), getPaint(path));
         }
     }
 
-    public int onDrawMosaicsPath(Canvas canvas) {
-        int layerCount = canvas.saveLayer(mFrame, null, Canvas.ALL_SAVE_FLAG);
-
-        if (!isMosaicEmpty()) {
-            canvas.save();
-            float scale = getScale();
-            canvas.translate(mFrame.left, mFrame.top);
-            canvas.scale(scale, scale);
-            for (IMGPath path : mMosaics) {
-                path.onDrawMosaic(canvas, mPaint);
-            }
-            canvas.restore();
+    public void drawPahth(Path path ,Paint paint){
+        if (!path.isEmpty()){
+            mRevertDoodles.clear();
         }
-
-        return layerCount;
+        mDoodleCanvas.drawPath(path,paint);
     }
 
-    public void onDrawMosaic(Canvas canvas, int layerCount) {
-        canvas.drawBitmap(mMosaicImage, null, mFrame, mMosaicPaint);
-        canvas.restoreToCount(layerCount);
-    }
 
-    public void onDrawDoodles(Canvas canvas) {
-        if (!isDoodleEmpty()) {
-            canvas.save();
-            float scale = getScale();
-            canvas.translate(mFrame.left, mFrame.top);
-            canvas.scale(scale, scale);
-            for (IMGPath path : mDoodles) {
-                path.onDrawDoodle(canvas, mPaint);
-            }
-            canvas.restore();
+    public void revertDoodle() {
+        mDoodleCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
+        if (!mDoodles.isEmpty()) {
+            //被移除的路径
+            IMGPath path = mDoodles.get(mDoodles.size() - 1);
+            mRevertDoodles.add(path);
+            mDoodles.remove(mDoodles.size() - 1);
+            Log.e("TestTag", "IMGImage-revertDoodle:mDoodles size--" + mDoodles.size());
         }
     }
+
+    public void cancelRevertDoodle() {
+        mDoodleCanvas.drawColor(0, PorterDuff.Mode.CLEAR);
+        if (!mRevertDoodles.isEmpty()) {
+            //取消移除的路径
+            IMGPath path = mRevertDoodles.get(mRevertDoodles.size() - 1);
+            mDoodles.add(path);
+            mRevertDoodles.remove(mRevertDoodles.size() - 1);
+        }
+    }
+
+    private Paint getPaint(IMGPath path) {
+        switch (path.getMode()) {
+            case DOODLE:
+                mPaint.setColor(path.getColor());
+                mPaint.setStrokeWidth(path.getWidth());
+                return mPaint;
+            case ERRASER:
+                mEraserPaint.setStrokeWidth(path.getWidth());
+                return mEraserPaint;
+        }
+        return mPaint;
+    }
+
+    public Canvas getCanvas() {
+        return mDoodleCanvas;
+    }
+
 
     public void onDrawStickerClip(Canvas canvas) {
         M.setRotate(getRotate(), mClipFrame.centerX(), mClipFrame.centerY());
@@ -581,27 +498,10 @@ public class IMGImage {
         canvas.restore();
     }
 
-    public void onDrawShade(Canvas canvas) {
-        if (mMode == IMGMode.CLIP && isSteady) {
-            mShade.reset();
-            mShade.addRect(mFrame.left - 2, mFrame.top - 2, mFrame.right + 2, mFrame.bottom + 2, Path.Direction.CW);
-            mShade.addRect(mClipFrame, Path.Direction.CCW);
-            canvas.drawPath(mShade, mShadePaint);
-        }
-    }
-
-    public void onDrawClip(Canvas canvas, float scrollX, float scrollY) {
-        if (mMode == IMGMode.CLIP) {
-            mClipWin.onDraw(canvas);
-        }
-    }
 
     public void onTouchDown(float x, float y) {
         isSteady = false;
         moveToBackground(mForeSticker);
-        if (mMode == IMGMode.CLIP) {
-            mAnchor = mClipWin.getAnchor(x, y);
-        }
     }
 
     public void onTouchUp(float scrollX, float scrollY) {
@@ -616,15 +516,11 @@ public class IMGImage {
         mClipWin.setShowShade(true);
     }
 
-    public void onScaleBegin() {
-
-    }
 
     public IMGHoming onScroll(float scrollX, float scrollY, float dx, float dy) {
         if (mMode == IMGMode.CLIP) {
             mClipWin.setShowShade(false);
             if (mAnchor != null) {
-                mClipWin.onScroll(mAnchor, dx, dy);
 
                 RectF clipFrame = new RectF();
                 M.setRotate(getRotate(), mClipFrame.centerX(), mClipFrame.centerY());
@@ -647,13 +543,6 @@ public class IMGImage {
         this.mTargetRotate = targetRotate;
     }
 
-    /**
-     * 在当前基础上旋转
-     */
-    public void rotate(int rotate) {
-        mTargetRotate = Math.round((mRotate + rotate) / 90f) * 90;
-        mClipWin.reset(mClipFrame, getTargetRotate());
-    }
 
     public float getRotate() {
         return mRotate;
@@ -664,7 +553,7 @@ public class IMGImage {
     }
 
     public float getScale() {
-        return 1f * mFrame.width() / mImage.getWidth();
+        return 1f * mFrame.width() / mBgBitmap.getWidth();
     }
 
     public void setScale(float scale) {
@@ -703,38 +592,6 @@ public class IMGImage {
         }
     }
 
-    public void onScaleEnd() {
-
-    }
-
-    public void onHomingStart(boolean isRotate) {
-        isAnimCanceled = false;
-        isDrawClip = true;
-    }
-
-    public void onHoming(float fraction) {
-        mClipWin.homing(fraction);
-    }
-
-    public boolean onHomingEnd(float scrollX, float scrollY, boolean isRotate) {
-        isDrawClip = true;
-        if (mMode == IMGMode.CLIP) {
-            // 开启裁剪模式
-
-            boolean clip = !isAnimCanceled;
-
-            mClipWin.setHoming(false);
-            mClipWin.setClipping(true);
-            mClipWin.setResetting(false);
-
-            return clip;
-        } else {
-            if (isFreezing && !isAnimCanceled) {
-                setFreezing(false);
-            }
-        }
-        return false;
-    }
 
     public boolean isFreezing() {
         return isFreezing;
@@ -753,8 +610,8 @@ public class IMGImage {
     }
 
     public void release() {
-        if (mImage != null && !mImage.isRecycled()) {
-            mImage.recycle();
+        if (mBgBitmap != null && !mBgBitmap.isRecycled()) {
+            mBgBitmap.recycle();
         }
     }
 

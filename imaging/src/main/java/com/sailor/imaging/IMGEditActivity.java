@@ -5,11 +5,14 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.text.TextUtils;
+
 import com.sailor.imaging.core.IMGMode;
 import com.sailor.imaging.core.IMGText;
 import com.sailor.imaging.core.file.IMGAssetFileDecoder;
 import com.sailor.imaging.core.file.IMGDecoder;
 import com.sailor.imaging.core.file.IMGFileDecoder;
+import com.sailor.imaging.core.file.IMGPathDecoder;
+import com.sailor.imaging.core.font.FontManager;
 import com.sailor.imaging.core.util.IMGUtils;
 
 import java.io.FileNotFoundException;
@@ -32,7 +35,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
 
     @Override
     public void onCreated() {
-
+        //初始化字体
+        FontManager.INSTANCE.init(getBaseContext());
     }
 
     @Override
@@ -57,6 +61,9 @@ public class IMGEditActivity extends IMGEditBaseActivity {
                     break;
                 case "file":
                     decoder = new IMGFileDecoder(uri);
+                    break;
+                case "content":
+                    decoder = new IMGPathDecoder(this, uri);
                     break;
             }
         }
@@ -98,26 +105,13 @@ public class IMGEditActivity extends IMGEditBaseActivity {
     @Override
     public void onModeClick(IMGMode mode) {
         IMGMode cm = mImgView.getMode();
-        if (cm == mode) {
+        if (cm == mode&&cm!=IMGMode.ERRASER) {
             mode = IMGMode.NONE;
         }
         mImgView.setMode(mode);
-        updateModeUI();
-
-        if (mode == IMGMode.CLIP) {
-            setOpDisplay(OP_CLIP);
-        }
     }
 
-    @Override
-    public void onUndoClick() {
-        IMGMode mode = mImgView.getMode();
-        if (mode == IMGMode.DOODLE) {
-            mImgView.undoDoodle();
-        } else if (mode == IMGMode.MOSAIC) {
-            mImgView.undoMosaic();
-        }
-    }
+
 
     @Override
     public void onCancelClick() {
@@ -155,29 +149,8 @@ public class IMGEditActivity extends IMGEditBaseActivity {
     }
 
     @Override
-    public void onCancelClipClick() {
-        mImgView.cancelClip();
-        setOpDisplay(mImgView.getMode() == IMGMode.CLIP ? OP_CLIP : OP_NORMAL);
-    }
-
-    @Override
-    public void onDoneClipClick() {
-        mImgView.doClip();
-        setOpDisplay(mImgView.getMode() == IMGMode.CLIP ? OP_CLIP : OP_NORMAL);
-    }
-
-    @Override
-    public void onResetClipClick() {
-        mImgView.resetClip();
-    }
-
-    @Override
-    public void onRotateClipClick() {
-        mImgView.doRotate();
-    }
-
-    @Override
     public void onColorChanged(int checkedColor) {
         mImgView.setPenColor(checkedColor);
     }
+
 }

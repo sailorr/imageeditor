@@ -1,24 +1,18 @@
 package com.sailor.imaging.core;
 
-import android.graphics.*;
+import android.graphics.Color;
+import android.graphics.Path;
 
 /**
  * Created by felix on 2017/11/22 下午6:13.
  */
 
 public class IMGPath {
-
     protected Path path;
-
-    private int color = Color.RED;
-
-    private float width = BASE_MOSAIC_WIDTH;
-
+    private int color = Color.WHITE;
+    private float width = BASE_DOODLE_WIDTH;
     private IMGMode mode = IMGMode.DOODLE;
-
     public static final float BASE_DOODLE_WIDTH = 20f;
-
-    public static final float BASE_MOSAIC_WIDTH = 72f;
 
     public IMGPath() {
         this(new Path());
@@ -29,11 +23,11 @@ public class IMGPath {
     }
 
     public IMGPath(Path path, IMGMode mode) {
-        this(path, mode, Color.RED);
+        this(path, mode, Color.WHITE);
     }
 
     public IMGPath(Path path, IMGMode mode, int color) {
-        this(path, mode, color, BASE_MOSAIC_WIDTH);
+        this(path, mode, color, BASE_DOODLE_WIDTH);
     }
 
     public IMGPath(Path path, IMGMode mode, int color, float width) {
@@ -78,23 +72,5 @@ public class IMGPath {
         return width;
     }
 
-    public void onDrawDoodle(Canvas canvas, Paint paint) {
-        if (mode == IMGMode.DOODLE) {
-            paint.setColor(color);
-            paint.setStrokeWidth(BASE_DOODLE_WIDTH);
-            // rewind
-            canvas.drawPath(path, paint);
-        }
-    }
 
-    public void onDrawMosaic(Canvas canvas, Paint paint) {
-        if (mode == IMGMode.MOSAIC) {
-            paint.setStrokeWidth(width);
-            canvas.drawPath(path, paint);
-        }
-    }
-
-    public void transform(Matrix matrix) {
-        path.transform(matrix);
-    }
 }

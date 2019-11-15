@@ -2,6 +2,7 @@ package com.sailor.imageeditor
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -22,7 +23,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-
         orginal.setOnClickListener {
             val albumIntent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
             startActivityForResult(albumIntent, CODE_SELECT_IMAGE)
@@ -39,16 +39,8 @@ class MainActivity : AppCompatActivity() {
         }).start()
 
         edit.setOnClickListener {
-//            val intent = Intent(this@MainActivity, IMGEditActivity::class.java)
-//                .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, uri)
-//                .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, path)
-//            startActivityForResult(intent, CODE_IMG_EDIT)
-            Log.d("MainActivity", "onCreate: setOnClickListener")
-//            var intent = Intent(this@MainActivity,IMGEditActivity::class.java)
-//            startActivity(intent)
 
-
-            startActivityForResult(Intent(this, IMGEditActivity::class.java)
+            startActivityForResult(Intent(this@MainActivity, IMGEditActivity::class.java)
                 .putExtra(IMGEditActivity.EXTRA_IMAGE_URI, uri)
                 .putExtra(IMGEditActivity.EXTRA_IMAGE_SAVE_PATH, path), CODE_IMG_EDIT)
         }
@@ -58,7 +50,7 @@ class MainActivity : AppCompatActivity() {
     var uri: Uri? = null
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        Log.d("MainActivity", "onActivityResult: "+data?.data)
+        Log.d("MainActivity", "onActivityResult: requestCode-->"+requestCode+" data--->"+data?.data)
         if (resultCode == Activity.RESULT_OK) {
             when (requestCode) {
                 CODE_SELECT_IMAGE -> {
@@ -66,7 +58,7 @@ class MainActivity : AppCompatActivity() {
                     orginal.setImageURI(uri)
                 }
                 CODE_IMG_EDIT -> {
-
+                    change.setImageBitmap(BitmapFactory.decodeFile(path))
                 }
             }
 

@@ -37,6 +37,7 @@ public class IMGAssetFileDecoder extends IMGDecoder {
 
         try {
             InputStream iStream = mContext.getAssets().open(path);
+
             return BitmapFactory.decodeStream(iStream, null, options);
         } catch (IOException ignore) {
 

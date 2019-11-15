@@ -13,9 +13,32 @@ public class IMGText {
 
     private int color = Color.WHITE;
 
+    private boolean shadow;
+
+    private  String fontName;
+
+    public String getFontName() {
+        return fontName;
+    }
+
+    public void setFontName(String fontName) {
+        this.fontName = fontName;
+    }
+
     public IMGText(String text, int color) {
         this.text = text;
         this.color = color;
+        this.shadow = shadow;
+        this.fontName = fontName;
+    }
+
+
+    public boolean isShadow() {
+        return shadow;
+    }
+
+    public void setShadow(boolean shadow) {
+        this.shadow = shadow;
     }
 
     public String getText() {

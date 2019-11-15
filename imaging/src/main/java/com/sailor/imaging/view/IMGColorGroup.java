@@ -17,11 +17,12 @@ public class IMGColorGroup extends RadioGroup {
 
     public IMGColorGroup(Context context, AttributeSet attrs) {
         super(context, attrs);
+//        LayoutInflater.from(context).inflate(R.layout.image_color_layout,this);
     }
 
     public int getCheckColor() {
-        int checkedId = getCheckedRadioButtonId();
-        IMGColorRadio radio = findViewById(checkedId);
+        int checkId = getCheckedRadioButtonId();
+        IMGColorRadio radio = findViewById(checkId);
         if (radio != null) {
             return radio.getColor();
         }
@@ -38,4 +39,6 @@ public class IMGColorGroup extends RadioGroup {
             }
         }
     }
+
+
 }

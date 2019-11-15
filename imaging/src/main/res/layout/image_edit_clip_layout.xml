@@ -14,17 +14,6 @@
         android:background="@drawable/image_bg_bottom"
         android:orientation="vertical">
 
-        <ImageButton
-            android:id="@+id/ib_clip_rotate"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginLeft="20dp"
-            android:layout_marginStart="20dp"
-            android:background="@null"
-            android:contentDescription="@string/image_rotate"
-            android:onClick="onClick"
-            android:src="@drawable/image_btn_rotate" />
-
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

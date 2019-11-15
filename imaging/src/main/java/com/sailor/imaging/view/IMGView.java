@@ -1,13 +1,26 @@
 package com.sailor.imaging.view;
 
-import android.animation.Animator;
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.graphics.*;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffXfermode;
+import android.graphics.RectF;
 import android.util.AttributeSet;
-import android.util.Log;
-import android.view.*;
+import android.view.GestureDetector;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.FrameLayout;
+
 import com.sailor.imaging.core.IMGImage;
 import com.sailor.imaging.core.IMGMode;
 import com.sailor.imaging.core.IMGPath;
@@ -20,12 +33,12 @@ import com.sailor.imaging.core.sticker.IMGStickerPortrait;
 /**
  * Created by felix on 2017/11/14 下午6:43.
  */
-public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetector.OnScaleGestureListener,
-        ValueAnimator.AnimatorUpdateListener, IMGStickerPortrait.Callback, Animator.AnimatorListener {
+public class IMGView extends FrameLayout implements Runnable,
+        ValueAnimator.AnimatorUpdateListener, IMGStickerPortrait.Callback {
 
     private static final String TAG = "IMGView";
 
-    private IMGMode mPreMode = IMGMode.NONE;
+    private IMGMode mMode = IMGMode.NONE;
 
     private IMGImage mImage = new IMGImage();
 
@@ -40,27 +53,34 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
     private int mPointerCount = 0;
 
     private Paint mDoodlePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private Paint mEraserPaint;
 
-    private Paint mMosaicPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private static final boolean DEBUG = true;
 
     {
         // 涂鸦画刷
         mDoodlePaint.setStyle(Paint.Style.STROKE);
-        mDoodlePaint.setStrokeWidth(IMGPath.BASE_DOODLE_WIDTH);
-        mDoodlePaint.setColor(Color.RED);
-        mDoodlePaint.setPathEffect(new CornerPathEffect(IMGPath.BASE_DOODLE_WIDTH));
-        mDoodlePaint.setStrokeCap(Paint.Cap.ROUND);
-        mDoodlePaint.setStrokeJoin(Paint.Join.ROUND);
+        mDoodlePaint.setStrokeWidth(IMGPath.BASE_DOODLE_WIDTH);//画笔粗细
+        mDoodlePaint.setColor(Color.WHITE);//画笔默认颜色
+        mDoodlePaint.setStrokeCap(Paint.Cap.ROUND);//开始点为圆形
+        mDoodlePaint.setStrokeJoin(Paint.Join.ROUND);//结束点为圆形
+        mDoodlePaint.setAntiAlias(true);
+        mDoodlePaint.setDither(true);
 
-        // 马赛克画刷
-        mMosaicPaint.setStyle(Paint.Style.STROKE);
-        mMosaicPaint.setStrokeWidth(IMGPath.BASE_MOSAIC_WIDTH);
-        mMosaicPaint.setColor(Color.BLACK);
-        mMosaicPaint.setPathEffect(new CornerPathEffect(IMGPath.BASE_MOSAIC_WIDTH));
-        mMosaicPaint.setStrokeCap(Paint.Cap.ROUND);
-        mMosaicPaint.setStrokeJoin(Paint.Join.ROUND);
+        //橡皮擦
+        mEraserPaint = new Paint();
+
+        mEraserPaint.setAlpha(0);
+        mEraserPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN));
+
+        //上面这句代码是橡皮擦设置的重点（重要的事是不是一定要说三遍）
+        mEraserPaint.setAntiAlias(true);
+        mEraserPaint.setDither(true);
+        mEraserPaint.setStyle(Paint.Style.STROKE);
+        mEraserPaint.setStrokeJoin(Paint.Join.ROUND);
+        mEraserPaint.setStrokeWidth(IMGPath.BASE_DOODLE_WIDTH);
+
     }
 
     public IMGView(Context context) {
@@ -79,25 +99,28 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
     private void initialize(Context context) {
         mPen.setMode(mImage.getMode());
         mGDetector = new GestureDetector(context, new MoveAdapter());
-        mSGDetector = new ScaleGestureDetector(context, this);
     }
 
     public void setImageBitmap(Bitmap image) {
         mImage.setBitmap(image);
+
         invalidate();
     }
 
     public void setMode(IMGMode mode) {
+
         // 保存现在的编辑模式
-        mPreMode = mImage.getMode();
+        this.mMode = mode;
 
         // 设置新的编辑模式
         mImage.setMode(mode);
         mPen.setMode(mode);
 
+
         // 矫正区域
         onHoming();
     }
+
 
     /**
      * 是否真正修正归位
@@ -118,7 +141,6 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         if (mHomingAnimator == null) {
             mHomingAnimator = new IMGHomingAnimator();
             mHomingAnimator.addUpdateListener(this);
-            mHomingAnimator.addListener(this);
         }
         mHomingAnimator.setHomingValues(sHoming, eHoming);
         mHomingAnimator.start();
@@ -130,50 +152,34 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         }
     }
 
-    public void doRotate() {
-        if (!isHoming()) {
-            mImage.rotate(-90);
-            onHoming();
-        }
-    }
-
-    public void resetClip() {
-        mImage.resetClip();
-        onHoming();
-    }
-
-    public void doClip() {
-        mImage.clip(getScrollX(), getScrollY());
-        setMode(mPreMode);
-        onHoming();
-    }
-
-    public void cancelClip() {
-        mImage.toBackupClip();
-        setMode(mPreMode);
-    }
-
     public void setPenColor(int color) {
+        mMode = IMGMode.DOODLE;
+        mDoodlePaint.setColor(color);
         mPen.setColor(color);
+        mPen.setMode(IMGMode.DOODLE);
     }
 
-    public boolean isDoodleEmpty() {
-        return mImage.isDoodleEmpty();
+    private float paintSize = IMGPath.BASE_DOODLE_WIDTH;
+
+    public void setPenSize(int size) {
+        paintSize = 2 + 2 * size * size;
+        mPen.setWidth(2 + 2 * size * size);
+
+        mDoodlePaint.setStrokeWidth(paintSize);
+        mEraserPaint.setStrokeWidth(paintSize);
+
     }
 
-    public void undoDoodle() {
-        mImage.undoDoodle();
+    public void onRevert() {
+        mImage.revertDoodle();
         invalidate();
     }
 
-    public boolean isMosaicEmpty() {
-        return mImage.isMosaicEmpty();
-    }
-
-    public void undoMosaic() {
-        mImage.undoMosaic();
+    public void cancelRevert() {
+        mImage.cancelRevertDoodle();
         invalidate();
     }
+
 
     public IMGMode getMode() {
         return mImage.getMode();
@@ -184,67 +190,26 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         onDrawImages(canvas);
     }
 
-    private void onDrawImages(Canvas canvas) {
-        canvas.save();
-
-        // clip 中心旋转
-        RectF clipFrame = mImage.getClipFrame();
-        canvas.rotate(mImage.getRotate(), clipFrame.centerX(), clipFrame.centerY());
-
-        // 图片
-        mImage.onDrawImage(canvas);
-
-        // 马赛克
-        if (!mImage.isMosaicEmpty() || (mImage.getMode() == IMGMode.MOSAIC && !mPen.isEmpty())) {
-            int count = mImage.onDrawMosaicsPath(canvas);
-            if (mImage.getMode() == IMGMode.MOSAIC && !mPen.isEmpty()) {
-                mDoodlePaint.setStrokeWidth(IMGPath.BASE_MOSAIC_WIDTH);
-                canvas.save();
-                RectF frame = mImage.getClipFrame();
-                canvas.rotate(-mImage.getRotate(), frame.centerX(), frame.centerY());
-                canvas.translate(getScrollX(), getScrollY());
-                canvas.drawPath(mPen.getPath(), mDoodlePaint);
-                canvas.restore();
-            }
-            mImage.onDrawMosaic(canvas, count);
+    private Paint getPaint() {
+        switch (mMode) {
+            case DOODLE:
+                return mDoodlePaint;
+            case ERRASER:
+                return mEraserPaint;
         }
-
-        // 涂鸦
-        mImage.onDrawDoodles(canvas);
-        if (mImage.getMode() == IMGMode.DOODLE && !mPen.isEmpty()) {
-            mDoodlePaint.setColor(mPen.getColor());
-            mDoodlePaint.setStrokeWidth(IMGPath.BASE_DOODLE_WIDTH * mImage.getScale());
-            canvas.save();
-            RectF frame = mImage.getClipFrame();
-            canvas.rotate(-mImage.getRotate(), frame.centerX(), frame.centerY());
-            canvas.translate(getScrollX(), getScrollY());
-            canvas.drawPath(mPen.getPath(), mDoodlePaint);
-            canvas.restore();
-        }
-
-        if (mImage.isFreezing()) {
-            // 文字贴片
-            mImage.onDrawStickers(canvas);
-        }
-
-        mImage.onDrawShade(canvas);
-
-        canvas.restore();
-
-        if (!mImage.isFreezing()) {
-            // 文字贴片
-            mImage.onDrawStickerClip(canvas);
-            mImage.onDrawStickers(canvas);
-        }
-
-        // 裁剪
-        if (mImage.getMode() == IMGMode.CLIP) {
-            canvas.save();
-            canvas.translate(getScrollX(), getScrollY());
-            mImage.onDrawClip(canvas, getScrollX(), getScrollY());
-            canvas.restore();
-        }
+        return mDoodlePaint;
     }
+
+    private void onDrawImages(Canvas canvas) {
+        //背景
+        mImage.onDrawImage(canvas);
+        // 涂鸦
+        mImage.onDrawDoodles();
+        mImage.drawPahth(mPen.getPath(),getPaint());
+        //文字
+        mImage.onDrawStickers(canvas);
+    }
+
 
     public Bitmap saveBitmap() {
         mImage.stickAll();
@@ -354,7 +319,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
 
         mPointerCount = event.getPointerCount();
 
-        boolean handled = mSGDetector.onTouchEvent(event);
+        boolean handled = false;
 
         IMGMode mode = mImage.getMode();
 
@@ -400,14 +365,14 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
     }
 
     private boolean onPathBegin(MotionEvent event) {
-        mPen.reset(event.getX(), event.getY());
+        mPen.reset(event.getX(), event.getY() - mImage.getFrame().top);
         mPen.setIdentity(event.getPointerId(0));
         return true;
     }
 
     private boolean onPathMove(MotionEvent event) {
         if (mPen.isIdentity(event.getPointerId(0))) {
-            mPen.lineTo(event.getX(), event.getY());
+            mPen.lineTo(event.getX(), event.getY() - mImage.getFrame().top);
             invalidate();
             return true;
         }
@@ -418,7 +383,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         if (mPen.isEmpty()) {
             return false;
         }
-        mImage.addPath(mPen.toPath(), getScrollX(), getScrollY());
+        mImage.addPath(mPen.toPath());
         mPen.reset();
         invalidate();
         return true;
@@ -433,9 +398,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
     }
 
     boolean onSteady() {
-        if (DEBUG) {
-            Log.d(TAG, "onSteady: isHoming=" + isHoming());
-        }
+
         if (!isHoming()) {
             mImage.onSteady(getScrollX(), getScrollY());
             onHoming();
@@ -452,34 +415,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
     }
 
     @Override
-    public boolean onScale(ScaleGestureDetector detector) {
-        if (mPointerCount > 1) {
-            mImage.onScale(detector.getScaleFactor(),
-                    getScrollX() + detector.getFocusX(),
-                    getScrollY() + detector.getFocusY());
-            invalidate();
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public boolean onScaleBegin(ScaleGestureDetector detector) {
-        if (mPointerCount > 1) {
-            mImage.onScaleBegin();
-            return true;
-        }
-        return false;
-    }
-
-    @Override
-    public void onScaleEnd(ScaleGestureDetector detector) {
-        mImage.onScaleEnd();
-    }
-
-    @Override
     public void onAnimationUpdate(ValueAnimator animation) {
-        mImage.onHoming(animation.getAnimatedFraction());
         toApplyHoming((IMGHoming) animation.getAnimatedValue());
     }
 
@@ -525,36 +461,6 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
         return true;
     }
 
-    @Override
-    public void onAnimationStart(Animator animation) {
-        if (DEBUG) {
-            Log.d(TAG, "onAnimationStart");
-        }
-        mImage.onHomingStart(mHomingAnimator.isRotate());
-    }
-
-    @Override
-    public void onAnimationEnd(Animator animation) {
-        if (DEBUG) {
-            Log.d(TAG, "onAnimationEnd");
-        }
-        if (mImage.onHomingEnd(getScrollX(), getScrollY(), mHomingAnimator.isRotate())) {
-            toApplyHoming(mImage.clip(getScrollX(), getScrollY()));
-        }
-    }
-
-    @Override
-    public void onAnimationCancel(Animator animation) {
-        if (DEBUG) {
-            Log.d(TAG, "onAnimationCancel");
-        }
-        mImage.onHomingCancel(mHomingAnimator.isRotate());
-    }
-
-    @Override
-    public void onAnimationRepeat(Animator animation) {
-        // empty implementation.
-    }
 
     private boolean onScroll(float dx, float dy) {
         IMGHoming homing = mImage.onScroll(getScrollX(), getScrollY(), -dx, -dy);
@@ -586,6 +492,7 @@ public class IMGView extends FrameLayout implements Runnable, ScaleGestureDetect
     private static class Pen extends IMGPath {
 
         private int identity = Integer.MIN_VALUE;
+
 
         void reset() {
             this.path.reset();

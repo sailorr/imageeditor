@@ -142,13 +142,6 @@ public class IMGClipWindow implements IMGClip {
         isResetting = resetting;
     }
 
-    public RectF getFrame() {
-        return mFrame;
-    }
-
-    public RectF getWinFrame() {
-        return mWinFrame;
-    }
 
     public RectF getOffsetFrame(float offsetX, float offsetY) {
         RectF frame = new RectF(mFrame);
@@ -160,15 +153,6 @@ public class IMGClipWindow implements IMGClip {
         return mTargetFrame;
     }
 
-    public RectF getOffsetTargetFrame(float offsetX, float offsetY) {
-        RectF targetFrame = new RectF(mFrame);
-        targetFrame.offset(offsetX, offsetY);
-        return targetFrame;
-    }
-
-    public boolean isShowShade() {
-        return isShowShade;
-    }
 
     public void setShowShade(boolean showShade) {
         isShowShade = showShade;
@@ -213,42 +197,7 @@ public class IMGClipWindow implements IMGClip {
         canvas.drawLines(mCorners, mPaint);
     }
 
-    public void onDrawShade(Canvas canvas) {
-        if (!isShowShade) return;
 
-        // 计算遮罩图形
-        mShadePath.reset();
 
-        mShadePath.setFillType(Path.FillType.WINDING);
-        mShadePath.addRect(mFrame.left + 100, mFrame.top + 100, mFrame.right - 100, mFrame.bottom - 100, Path.Direction.CW);
-
-        mPaint.setColor(COLOR_SHADE);
-        mPaint.setStyle(Paint.Style.FILL);
-        canvas.drawPath(mShadePath, mPaint);
-    }
-
-    public Anchor getAnchor(float x, float y) {
-        if (Anchor.isCohesionContains(mFrame, -CLIP_CORNER_SIZE, x, y)
-                && !Anchor.isCohesionContains(mFrame, CLIP_CORNER_SIZE, x, y)) {
-            int v = 0;
-            float[] cohesion = Anchor.cohesion(mFrame, 0);
-            float[] pos = {x, y};
-            for (int i = 0; i < cohesion.length; i++) {
-                if (Math.abs(cohesion[i] - pos[i >> 1]) < CLIP_CORNER_SIZE) {
-                    v |= 1 << i;
-                }
-            }
-
-            Anchor anchor = Anchor.valueOf(v);
-            if (anchor != null) {
-                isHoming = false;
-            }
-            return anchor;
-        }
-        return null;
-    }
-
-    public void onScroll(Anchor anchor, float dx, float dy) {
-        anchor.move(mWinFrame, mFrame, dx, dy);
-    }
 }
+
